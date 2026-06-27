@@ -1,0 +1,146 @@
+```html
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Travel Checklist - Bold Edition</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700&family=Plus+Jakarta+Sans:wght@700;800&display=swap');
+        body { font-family: 'Plus Jakarta Sans', sans-serif; background: #fdfaf6; color: #44403c; }
+        h1, h2 { font-family: 'Playfair Display', serif; }
+        .glass { background: rgba(253, 250, 246, 0.8); backdrop-filter: blur(12px); border-bottom: 1px solid #e7e5e4; }
+        .luxury-card { background: #ffffff; border: 1px solid #e7e5e4; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05); }
+        .camera-overlay { position: fixed; inset: 0; z-index: 100; background: #000; display: none; }
+        .modal { position: fixed; inset: 0; z-index: 200; background: rgba(253, 250, 246, 0.98); display: none; align-items: center; justify-content: center; }
+        .scrollbar-hide::-webkit-scrollbar { display: none; }
+    </style>
+</head>
+<body>
+
+    <!-- Header -->
+    <header class="sticky top-0 z-50 glass">
+        <div class="max-w-2xl mx-auto">
+            <h1 class="text-4xl font-extrabold p-6 text-center text-[#292524] tracking-tight">Travel Checklist</h1>
+            <nav id="nav-tabs" class="flex overflow-x-auto gap-3 px-6 pb-4 scrollbar-hide"></nav>
+        </div>
+    </header>
+
+    <main id="list-container" class="p-6 max-w-2xl mx-auto space-y-8"></main>
+
+    <!-- Camera Overlay -->
+    <div id="camera-overlay" class="camera-overlay">
+        <video id="video" class="w-full h-full object-cover" autoplay playsinline></video>
+        <button id="snap-btn" class="absolute bottom-12 left-1/2 -translate-x-1/2 w-20 h-20 bg-white rounded-full border-4 border-[#a16207] shadow-2xl transition-transform active:scale-90"></button>
+    </div>
+
+    <!-- Modal -->
+    <div id="modal" class="modal" onclick="this.style.display='none'">
+        <img id="modal-img" class="max-w-[90%] max-h-[90%] rounded-2xl shadow-2xl">
+    </div>
+
+    <canvas id="canvas" class="hidden"></canvas>
+
+<script>
+    const data = {
+        "Clothes": ["Underwear", "Socks", "Bras", "Nighties", "Swimsuit", "Dresses", "Shirts", "T-shirts", "Sweaters", "Trousers", "Jeans", "Shorts", "Jackets", "Shoes", "Boots"],
+        "Toiletries": ["Toothbrush", "Toothpaste", "Face cleanser", "Sunscreen", "Deodorant", "Perfume", "Shampoo", "Conditioner", "Styling tools", "Makeup", "Medication"],
+        "Accessories": ["Bag", "Jewelry", "Watch", "Sunglasses", "Umbrella"],
+        "Electronics": ["Mobile", "Laptop", "Chargers", "Camera", "Adapter"],
+        "Documents": ["Passport", "Tickets", "Visa", "Insurance", "Bank cards"],
+        "Others": ["First aid", "Book", "Headphones", "Snacks"]
+    };
+
+    let checkedItems = JSON.parse(localStorage.getItem('boldBeigePackingData')) || {};
+    let currentItem = "";
+
+    function getProgress(category) {
+        const items = data[category];
+        const count = items.filter(i => checkedItems[i]).length;
+        return { count, total: items.length };
+    }
+
+    async function openCamera(item) {
+        currentItem = item;
+        document.getElementById('camera-overlay').style.display = 'block';
+        try {
+            const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: { exact: "environment" } } });
+            document.getElementById('video').srcObject = stream;
+        } catch(e) { 
+            const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+            document.getElementById('video').srcObject = stream;
+        }
+    }
+
+    document.getElementById('snap-btn').onclick = () => {
+        const video = document.getElementById('video'), canvas = document.getElementById('canvas');
+        canvas.width = video.videoWidth; canvas.height = video.videoHeight;
+        canvas.getContext('2d').drawImage(video, 0, 0);
+        localStorage.setItem(`photo_${currentItem}`, canvas.toDataURL('image/jpeg', 0.5));
+        video.srcObject.getTracks().forEach(t => t.stop());
+        document.getElementById('camera-overlay').style.display = 'none';
+        render();
+    };
+
+    function render() {
+        const navTabs = document.getElementById('nav-tabs');
+        const container = document.getElementById('list-container');
+        container.innerHTML = '';
+        navTabs.innerHTML = '';
+
+        for (const [category, items] of Object.entries(data)) {
+            const prog = getProgress(category);
+            
+            navTabs.innerHTML += `
+                <button onclick="document.getElementById('${category}').scrollIntoView({behavior:'smooth'})" 
+                        class="whitespace-nowrap px-5 py-2 rounded-full text-sm font-extrabold border-2 border-[#d6d3d1] hover:border-[#a16207] hover:text-[#a16207] transition-all">
+                    ${category} <span class="opacity-60">${prog.count}/${prog.total}</span>
+                </button>
+            `;
+
+            const section = document.createElement('div');
+            section.id = category;
+            section.innerHTML = `<h2 class="text-3xl font-extrabold text-[#292524] mb-6 border-b border-[#e7e5e4] pb-2">${category}</h2>`;
+            
+            items.forEach(item => {
+                const photo = localStorage.getItem('photo_' + item);
+                const isChecked = !!checkedItems[item];
+                const div = document.createElement('div');
+                div.className = "luxury-card flex items-center p-5 rounded-2xl";
+                div.innerHTML = `
+                    <input type="checkbox" ${isChecked ? 'checked' : ''} class="w-6 h-6 accent-[#a16207] cursor-pointer scale-125">
+                    <span class="ml-5 flex-grow font-extrabold text-lg ${isChecked ? 'line-through opacity-50' : ''}">${item}</span>
+                    <div class="w-14 h-14 ml-2 bg-[#f5f5f4] rounded-lg border-2 border-[#e7e5e4] flex items-center justify-center overflow-hidden cursor-pointer shrink-0">
+                        ${photo ? `<img src="${photo}" class="w-full h-full object-cover" onclick="openModal('${photo}')">` : '<span class="opacity-30 font-bold">📷</span>'}
+                    </div>
+                `;
+                div.querySelector('input').onclick = (e) => {
+                    if (e.target.checked) {
+                        checkedItems[item] = true;
+                        localStorage.setItem('boldBeigePackingData', JSON.stringify(checkedItems));
+                        openCamera(item);
+                    } else {
+                        checkedItems[item] = false;
+                        localStorage.removeItem('photo_' + item);
+                        localStorage.setItem('boldBeigePackingData', JSON.stringify(checkedItems));
+                        render();
+                    }
+                };
+                section.appendChild(div);
+            });
+            container.appendChild(section);
+        }
+    }
+
+    function openModal(src) {
+        document.getElementById('modal-img').src = src;
+        document.getElementById('modal').style.display = 'flex';
+    }
+
+    render();
+</script>
+</body>
+</html>
+
+```
